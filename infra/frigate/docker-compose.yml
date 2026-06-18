@@ -20,7 +20,12 @@
 services:
   frigate:
     container_name: frigate-nvr-archive
-    image: ghcr.io/blakeblackshear/frigate:stable
+    # Pinned: the bundled config.yml targets the 0.14 schema. The floating
+    # `:stable` tag has since moved to 0.17+, whose stricter schema rejects this
+    # config and drops Frigate into safe mode (no cameras). Pin to a matching
+    # release so a fresh clone reproduces a working engine. To move to a newer
+    # Frigate, bump this tag AND migrate config.yml to that version's schema.
+    image: ghcr.io/blakeblackshear/frigate:0.14.1
     restart: unless-stopped
     shm_size: "128mb"
     ports:

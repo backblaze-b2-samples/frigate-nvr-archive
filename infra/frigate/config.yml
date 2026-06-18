@@ -19,19 +19,13 @@ detectors:
     type: cpu
     num_threads: 2
 
-# Keep continuous recordings so the archive worker has recording segments, and
-# retain detection events longer than passive footage.
+# Keep continuous recordings (mode: all) so the archive worker always has
+# recording segments to pull, and event clips are generated for detections.
 record:
   enabled: true
   retain:
-    days: 3
+    days: 7
     mode: all
-  alerts:
-    retain:
-      days: 14
-  detections:
-    retain:
-      days: 14
 
 snapshots:
   enabled: true
