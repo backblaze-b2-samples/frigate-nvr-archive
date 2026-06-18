@@ -1,0 +1,72 @@
+# Frigate configuration — the detection engine for frigate-nvr-archive.
+#
+# This is a minimal, CPU-only config that demonstrates real detection on a
+# single camera. Frigate downloads no API key and runs detection locally. For
+# production (real cameras, Coral/GPU detectors, zones, masks) follow the
+# upstream docs: https://docs.frigate.video/configuration/
+#
+# The bundled "front_door" camera reads a looped local file by default. To use a
+# real camera, set FRIGATE_RTSP_INPUT in your .env (compose passes it through)
+# and change the input `path` below to "{FRIGATE_RTSP_INPUT}".
+
+mqtt:
+  enabled: false
+
+# CPU detector — works everywhere, no accelerator required. Swap for `edgetpu`
+# (Coral) or a GPU detector for real workloads.
+detectors:
+  cpu1:
+    type: cpu
+    num_threads: 2
+
+# Keep continuous recordings so the archive worker has recording segments, and
+# retain detection events longer than passive footage.
+record:
+  enabled: true
+  retain:
+    days: 3
+    mode: all
+  alerts:
+    retain:
+      days: 14
+  detections:
+    retain:
+      days: 14
+
+snapshots:
+  enabled: true
+  bounding_box: true
+  retain:
+    default: 14
+
+# Objects Frigate detects (its built-in model). The archive's event index uses
+# these labels for search ("all persons at the front door this week").
+objects:
+  track:
+    - person
+    - car
+    - dog
+    - cat
+
+cameras:
+  front_door:
+    ffmpeg:
+      inputs:
+        # Looped local sample file (mount your own at infra/frigate/media/).
+        # For a real camera, replace with: path: "{FRIGATE_RTSP_INPUT}"
+        - path: /media/frigate/input/sample.mp4
+          input_args: -re -stream_loop -1 -fflags +genpts
+          roles:
+            - detect
+            - record
+    detect:
+      enabled: true
+      width: 1280
+      height: 720
+      fps: 5
+    zones:
+      # Example zone so events carry a searchable zone ("front_door/porch").
+      porch:
+        coordinates: 0,720,1280,720,1280,400,0,400
+
+version: 0.14

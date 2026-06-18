@@ -1,0 +1,20 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+python-multipart>=0.0.18
+python-dotenv>=1.0.0
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+boto3>=1.35.0
+python-magic>=0.4.27
+Pillow>=11.0.0
+
+# --- Frigate NVR archive ---
+# httpx is the HTTP client the Frigate repo adapter (repo/frigate_client.py)
+# uses to consume Frigate's API. It is NOT a detection engine — Frigate runs
+# detection; we only read its events/clips/snapshots. No ultralytics/torch.
+httpx>=0.27.0
+
+# Dev / quality
+ruff>=0.8.0
+pytest>=8.0.0
+pytest-asyncio>=0.24.0

@@ -1,0 +1,40 @@
+# Real Frigate NVR — the detection engine this sample archives to B2.
+#
+# Frigate ingests an RTSP/file camera stream, runs LOCAL object detection
+# (person/car/etc.), and exposes recordings, event clips, and snapshots on its
+# HTTP API at :5000. Our archive worker (services/api/scripts/archive_worker.py)
+# consumes that API and ships media + a detection-event index to Backblaze B2.
+#
+# Detection is done by Frigate — never re-implemented in our Python.
+#
+# Quick start (CPU detector, looped sample file):
+#   1) Put a short H.264 .mp4 at infra/frigate/media/sample.mp4 (your own
+#      footage — none is committed to this repo), OR set FRIGATE_RTSP_INPUT to a
+#      real camera RTSP URL and edit config.yml's `inputs:` path accordingly.
+#   2) docker compose -f infra/frigate/docker-compose.yml up
+#   3) Open http://localhost:5000 to confirm Frigate is detecting.
+#   4) In another shell run the archive worker (see README).
+#
+# For real cameras and/or a Coral/GPU detector, see
+# https://docs.frigate.video/configuration/ .
+services:
+  frigate:
+    container_name: frigate-nvr-archive
+    image: ghcr.io/blakeblackshear/frigate:stable
+    restart: unless-stopped
+    shm_size: "128mb"
+    ports:
+      - "5000:5000" # HTTP API + UI (consumed by the archive worker)
+      - "8554:8554" # RTSP restream (optional)
+    environment:
+      # FRIGATE_RTSP_INPUT lets you point at a real camera without editing
+      # config.yml. Leave unset to use the bundled looped-file input.
+      FRIGATE_RTSP_INPUT: ${FRIGATE_RTSP_INPUT:-}
+    volumes:
+      - ./config.yml:/config/config.yml:ro
+      - ./media:/media/frigate/input:ro # your looped sample file (not committed)
+      - frigate-storage:/media/frigate # recordings, clips, snapshots
+      - /etc/localtime:/etc/localtime:ro
+
+volumes:
+  frigate-storage:
