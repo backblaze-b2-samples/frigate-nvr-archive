@@ -38,13 +38,31 @@ export class ApiError extends Error {
   }
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+/** Default per-request timeout. Bounds any single call so the UI never hangs
+ * on a stalled request; callers can override via `timeoutMs`. */
+const DEFAULT_TIMEOUT_MS = 60_000;
+
+async function apiFetch<T>(
+  path: string,
+  init?: RequestInit & { timeoutMs?: number },
+): Promise<T> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = init ?? {};
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, init);
-  } catch {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...requestInit,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError("Request timed out — please try again", 408);
+    }
     // Network failure (offline, DNS, CORS, etc.)
     throw new ApiError("Network error — check your connection", 0);
+  } finally {
+    clearTimeout(timer);
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

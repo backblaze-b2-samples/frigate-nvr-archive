@@ -6,6 +6,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from app.config import settings
 from app.service import stats as stats_service
 from app.service.archive import archive_recent
 from app.service.events import EventError, clip_download_url, get_event, search_events
@@ -71,9 +72,15 @@ async def event_clip_endpoint(event_id: str):
 async def archive_now_endpoint():
     """On-demand pull of recent Frigate events into the B2 archive. The standing
     worker (scripts/archive_worker.py) does this on a loop; this endpoint lets
-    the UI trigger a one-shot sync."""
+    the UI trigger a one-shot sync.
+
+    Bounded to `archive_sync_limit` newly-archived events so the request returns
+    in seconds and the button gets a prompt confirmation; repeated clicks drain
+    any remaining backlog. A transient clip error for one event is already
+    swallowed in the repo/service layer, so a pass completes instead of aborting.
+    """
     try:
-        return archive_recent()
+        return archive_recent(max_new=settings.archive_sync_limit)
     except RuntimeError as e:
         # Frigate or B2 unreachable — surface as 502 so the UI can explain.
         raise HTTPException(status_code=502, detail=str(e)) from None

@@ -37,13 +37,28 @@ a vendor cloud — the highest sustained write rate of any sample in the fleet.
 - Loop every `ARCHIVE_POLL_INTERVAL_S` seconds (or `--once` for a single pass)
 
 ## Edge Cases
-- Frigate offline → `RuntimeError`; worker logs and keeps polling (API returns 502)
-- Event has no clip/snapshot (404 from Frigate) → archived with `has_clip=false`
+- Frigate offline → `list_events` raises `RuntimeError`; worker logs and keeps polling (API returns 502)
+- Event clip/snapshot not ready (404 **or** a transient 500 while Frigate is still
+  finalizing the recording segment) → that artifact is skipped and logged; the
+  event is still archived with whatever media came back (`has_clip=false` when the
+  clip was skipped), so the index entry stays consistent and the pass continues
+- A failure archiving one event (e.g. a B2 hiccup) → logged and skipped; the rest
+  of the pass still completes
 - Duplicate event id in a re-poll → skipped (already indexed)
 - Malformed Frigate event → skipped with a warning
 
+## On-demand sync (UI button)
+- `POST /events/archive` passes `max_new=ARCHIVE_SYNC_LIMIT` (default 5) so a
+  single "Sync from Frigate" click archives at most a few new events and returns
+  in seconds (a full 50-event window of fresh clips would take minutes). Repeated
+  clicks drain any remaining backlog; the standing worker keeps the full window
+  current in the background.
+
 ## UX States
 - Events page "Sync from Frigate" button: idle / syncing (spinner) / toast result
+- The frontend `apiFetch` bounds every request with a 60s `AbortController`
+  timeout, so the button surfaces a "Request timed out" error rather than
+  spinning forever if a request ever stalls
 
 ## Verification
 - Test files: `services/api/tests/test_archive_worker.py`

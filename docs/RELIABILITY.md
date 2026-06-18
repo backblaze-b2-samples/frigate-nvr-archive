@@ -21,8 +21,15 @@ Reliability expectations and practices for this project.
   - Polling (`ARCHIVE_POLL_INTERVAL_S`) bounds how far behind Frigate the archive
     can drift; if B2 or Frigate hiccups, the worker logs and retries on the next
     poll rather than crashing, and idempotent skip-by-id avoids double-writes.
+  - A per-event failure is isolated: a not-yet-ready clip (404 or a transient 500
+    while Frigate finalizes a just-ended event's recording) or a B2 error on one
+    event is logged and skipped, never aborting the whole pass. The event is still
+    indexed with whatever media did upload, so the index stays consistent.
   - For very high event rates, increase the interval and `archive_event_limit`
     together, and consider sharding by camera prefix across workers.
+  - The on-demand UI sync is bounded by `ARCHIVE_SYNC_LIMIT` (default 5 new events
+    per click) so the request returns promptly instead of grinding through a full
+    window; the frontend also caps each request with a 60s client-side timeout.
 
 ## Error Handling
 

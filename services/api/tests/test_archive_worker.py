@@ -87,5 +87,96 @@ def test_archive_recent_skips_already_indexed(monkeypatch):
     assert summary["scanned"] == 1
 
 
+def test_archive_event_skips_clip_when_not_ready(monkeypatch):
+    """A clip that isn't ready (download_clip -> None) must still archive the
+    snapshot and index a consistent record with has_clip=False."""
+    appended: list[ArchiveEvent] = []
+
+    monkeypatch.setattr(archive_service.frigate, "download_clip", lambda _id: None)
+    monkeypatch.setattr(
+        archive_service.frigate, "download_snapshot", lambda _id: b"JPEG"
+    )
+    monkeypatch.setattr(
+        archive_service.store, "put_bytes", lambda key, data, ct: len(data)
+    )
+    monkeypatch.setattr(
+        archive_service.store, "append_event", lambda e: appended.append(e)
+    )
+    monkeypatch.setattr(archive_service.store, "read_cameras", lambda: {})
+    monkeypatch.setattr(archive_service.store, "write_cameras", lambda payload: None)
+
+    event = archive_service.archive_event(RAW_EVENT)
+
+    assert event is not None
+    assert event.has_clip is False
+    assert event.clip_key is None
+    assert event.has_snapshot is True
+    # Indexed exactly once, consistent with what was actually archived.
+    assert len(appended) == 1
+    assert appended[0].has_clip is False
+
+
+def test_archive_recent_continues_past_event_failure(monkeypatch):
+    """One event that raises must not abort the whole pass."""
+    raw_a = {**RAW_EVENT, "id": "a", "start_time": 1700000000.0}
+    raw_b = {**RAW_EVENT, "id": "b", "start_time": 1700000001.0}
+    monkeypatch.setattr(
+        archive_service.frigate, "list_events", lambda **kw: [raw_a, raw_b]
+    )
+    monkeypatch.setattr(archive_service, "_existing_ids_for", lambda raws: set())
+
+    def _archive(raw):
+        if raw["id"] == "a":
+            raise RuntimeError("B2 hiccup")
+        return ArchiveEvent.model_validate(
+            {
+                "id": "b",
+                "camera": "front_door",
+                "label": "person",
+                "score": 0.9,
+                "start_time": "2023-11-14T22:13:21+00:00",
+                "archived_at": "2023-11-14T22:13:25+00:00",
+            }
+        )
+
+    monkeypatch.setattr(archive_service, "archive_event", _archive)
+
+    summary = archive_service.archive_recent()
+    # "a" failed but "b" still archived.
+    assert summary["scanned"] == 2
+    assert summary["archived"] == 1
+
+
+def test_archive_recent_bounds_with_max_new(monkeypatch):
+    """max_new stops the pass after that many newly-archived events."""
+    raws = [
+        {**RAW_EVENT, "id": str(i), "start_time": 1700000000.0 + i} for i in range(5)
+    ]
+    monkeypatch.setattr(archive_service.frigate, "list_events", lambda **kw: raws)
+    monkeypatch.setattr(archive_service, "_existing_ids_for", lambda r: set())
+
+    calls: list[str] = []
+
+    def _archive(raw):
+        calls.append(raw["id"])
+        return ArchiveEvent.model_validate(
+            {
+                "id": raw["id"],
+                "camera": "front_door",
+                "label": "person",
+                "score": 0.9,
+                "start_time": "2023-11-14T22:13:20+00:00",
+                "archived_at": "2023-11-14T22:13:25+00:00",
+            }
+        )
+
+    monkeypatch.setattr(archive_service, "archive_event", _archive)
+
+    summary = archive_service.archive_recent(max_new=2)
+    assert summary["archived"] == 2
+    # Stopped after archiving 2 — did not grind through all 5.
+    assert len(calls) == 2
+
+
 def test_build_event_skips_malformed():
     assert archive_service._build_event({"id": None}) is None

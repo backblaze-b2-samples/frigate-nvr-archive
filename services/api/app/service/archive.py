@@ -97,12 +97,25 @@ def _touch_camera_registry(event: ArchiveEvent) -> None:
     store.write_cameras(registry)
 
 
-def archive_recent(limit: int | None = None, after: float | None = None) -> dict:
+def archive_recent(
+    limit: int | None = None,
+    after: float | None = None,
+    max_new: int | None = None,
+) -> dict:
     """Pull recent Frigate events and archive any not already in the index.
 
     Returns a small summary dict ({scanned, archived, bytes}). Designed to be
     called once per poll by the CLI worker (scripts/archive_worker.py) or on
     demand from the API.
+
+    `max_new` bounds how many *newly-archived* events one pass commits before it
+    returns; once reached the pass stops scanning. The on-demand UI sync uses
+    this so the request completes in seconds instead of grinding through a full
+    50-event window of fresh clips. None (the worker's default) archives every
+    new event in the window.
+
+    A failure archiving a single event (a B2 hiccup, say) is logged and skipped
+    rather than aborting the whole pass — one bad event must not drop the rest.
     """
     cap = limit or settings.archive_event_limit
     raw_events = frigate.list_events(limit=cap, after=after)
@@ -112,10 +125,16 @@ def archive_recent(limit: int | None = None, after: float | None = None) -> dict
     for raw in raw_events:
         if str(raw.get("id")) in seen:
             continue
-        event = archive_event(raw)
+        try:
+            event = archive_event(raw)
+        except RuntimeError as e:
+            logger.warning("Skipping event %s: %s", raw.get("id"), e)
+            continue
         if event is not None:
             archived += 1
             total_bytes += event.clip_bytes + event.snapshot_bytes
+            if max_new is not None and archived >= max_new:
+                break
     return {"scanned": len(raw_events), "archived": archived, "bytes": total_bytes}
 
 

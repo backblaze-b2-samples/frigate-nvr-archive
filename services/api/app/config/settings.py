@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     archive_poll_interval_s: int = 30
     # How many recently-ended Frigate events to pull per poll.
     archive_event_limit: int = 50
+    # How many new events a single on-demand UI sync ("Sync from Frigate")
+    # archives before returning. Kept small so the request completes in seconds
+    # and the button gets a prompt confirmation; the standing worker keeps the
+    # full window up to date in the background. Repeated clicks drain the rest.
+    archive_sync_limit: int = 5
 
     # --- B2 prefix scoping ---
     # Every object this app writes lives under this prefix. The /archive

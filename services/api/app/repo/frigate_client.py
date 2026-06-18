@@ -82,6 +82,15 @@ def download_snapshot(event_id: str) -> bytes | None:
 
 
 def _download(path: str) -> bytes | None:
+    """Fetch one media artifact. Returns None when it isn't available.
+
+    A single not-yet-ready artifact must never abort a whole archive pass, so
+    this is deliberately non-fatal: 404 (Frigate has no such media) and any
+    other error — most commonly a 500 while Frigate is still finalizing the
+    recording segment for a just-ended event, but also network blips — are all
+    treated as "not ready, skip this artifact" and logged. The caller archives
+    whatever media did come back and still writes a consistent index entry.
+    """
     try:
         with _client() as c:
             resp = c.get(path)
@@ -90,4 +99,5 @@ def _download(path: str) -> bytes | None:
             resp.raise_for_status()
             return resp.content
     except httpx.HTTPError as e:
-        raise RuntimeError(f"Frigate download failed for '{path}': {e}") from e
+        logger.warning("Frigate media not ready, skipping '%s': %s", path, e)
+        return None

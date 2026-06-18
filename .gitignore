@@ -52,3 +52,6 @@ services/api/data/
 
 # Frigate sample media — bring your own footage; never commit binaries
 infra/frigate/media/
+
+# Local verification inputs/artifacts
+.local/
