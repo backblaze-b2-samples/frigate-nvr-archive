@@ -17,13 +17,21 @@ The pitch: keep **months of affordable surveillance footage on B2** instead of a
 
 ## What it looks like
 
-**NVR Dashboard** — cameras, events today, footage archived to B2, daily write rate, object-class mix:
+**NVR Dashboard** — cameras, events today, footage archived to B2, the daily write-rate chart, the object-class mix, and recent detections.
 
 ![NVR dashboard with stat cards, write-rate chart, object-class breakdown, and recent events](docs/images/dashboard.png)
 
-**Events** — search the detection timeline and play clips from B2:
+**Events** — search the Frigate detection timeline with camera/object/date filters; each card is a real snapshot with Frigate's bounding boxes, streamed from B2.
 
 ![Event timeline with camera/object/date filters and snapshot thumbnails](docs/images/events.png)
+
+**Event detail** — open any event to play its clip straight from B2 via a short-lived presigned URL, with score, zone, and a download link.
+
+![Event detail dialog playing a clip from B2 with score, zone, and download button](docs/images/event-detail.png)
+
+**Archive Library** — a scoped explorer over this app's `frigate-nvr-archive/` B2 prefix, grouped by camera and date with clip/snapshot/recording counts.
+
+![Archive Library showing the front_door camera expanded to a per-date breakdown](docs/images/archive.png)
 
 ## How it works
 
