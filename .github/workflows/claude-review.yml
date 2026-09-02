@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
 
 permissions:
+  actions: write
   contents: read
 
 # AI review (code review, B2 standards, security) is handled by a local agent
